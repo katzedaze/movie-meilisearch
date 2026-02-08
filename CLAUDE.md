@@ -4,9 +4,11 @@
 
 映画・書籍のカタログデータを Meilisearch で全文検索できる Web サービス。
 日本語・英語の混合データに対応し、ファセットフィルタ (ジャンル・年・評価) を備える。
+SearXNG 連携により、ローカルに存在しないデータを Web 検索して取り込む機能も搭載。
 
 - URL: `http://localhost:3000`
 - Meilisearch: `http://localhost:7700`
+- SearXNG: `http://searxng:8080` (Docker 内部のみ)
 
 ## 技術スタック
 
@@ -15,7 +17,9 @@
 | フレームワーク | Leptos (SSR + WASM hydration) | 0.8 |
 | HTTP サーバー | Actix-web (leptos_actix 統合) | 4 |
 | 検索エンジン | Meilisearch | v1.15 |
+| Web 検索 | SearXNG (JSON API) | latest |
 | 検索 SDK | meilisearch-sdk (SSR only) | 0.32 |
+| HTTP クライアント | reqwest (SSR only) | 0.12 |
 | ユーティリティ | leptos-use (`signal_debounced`) | 0.18 |
 | ビルド | cargo-leptos (nightly Rust) | 0.3 |
 | インフラ | Docker Compose | - |
@@ -46,13 +50,15 @@ src/
 ├── lib.rs              # モジュール宣言 + hydrate() エントリ
 ├── main.rs             # Actix-web サーバー起動 (SSR feature のみ)
 ├── app.rs              # ルート App コンポーネント + Router 定義
-├── api.rs              # #[server] 関数 (検索・CRUD・seed・facets)
+├── api.rs              # #[server] 関数 (検索・CRUD・seed・facets・Web取り込み)
 ├── model/              # データ構造体 (SSR/WASM 両方で使用)
 │   ├── movie.rs
 │   ├── book.rs
-│   └── search.rs       # SearchResponse, SearchHit, FacetInfo 等
+│   ├── search.rs       # SearchResponse, SearchHit, FacetInfo 等
+│   └── web_result.rs   # WebResult (Web検索取り込み結果)
 ├── server/             # SSR 専用ロジック (#[cfg(feature = "ssr")])
-│   ├── meilisearch.rs  # クライアントシングルトン + フィルタ構築
+│   ├── meilisearch.rs  # クライアントシングルトン + フィルタ構築 + web index設定
+│   ├── searxng.rs      # SearXNG HTTPクライアント (reqwest)
 │   └── seed.rs         # JSON → Meilisearch 投入
 ├── pages/              # ページコンポーネント (Router の view に対応)
 │   ├── home.rs
@@ -66,6 +72,7 @@ src/
     └── pagination.rs
 
 seed/                   # サンプルデータ JSON (include_str! で埋め込み)
+searxng/                # SearXNG 設定 (settings.yml)
 style/main.scss         # SCSS スタイル (cargo-leptos が自動コンパイル)
 docs/                   # ドキュメント・作業リスト・検証エビデンス
 ```
@@ -77,14 +84,14 @@ docs/                   # ドキュメント・作業リスト・検証エビデ
 
 | 分類 | feature gate | 例 |
 | --- | --- | --- |
-| モデル構造体 (`model/`) | **なし** (両方で必要) | `Movie`, `Book`, `SearchResponse` |
+| モデル構造体 (`model/`) | **なし** (両方で必要) | `Movie`, `Book`, `WebResult`, `SearchResponse` |
 | `#[server]` 関数の宣言 | **なし** (Leptos が自動処理) | `pub async fn search_items(...)` |
 | `#[server]` 関数内の `use` | 関数本体内に書く | `use crate::server::meilisearch::get_client;` |
 | SSR 専用の定数・ヘルパー | `#[cfg(feature = "ssr")]` | `const HITS_PER_PAGE`, `parse_facets()` |
 | `server/` モジュール全体 | `#[cfg(feature = "ssr")]` | `lib.rs` で gate |
-| SSR 専用クレート | `optional = true` + feature | `meilisearch-sdk`, `serde_json` |
+| SSR 専用クレート | `optional = true` + feature | `meilisearch-sdk`, `serde_json`, `reqwest` |
 
-**重要:** `#[server]` 関数の戻り値型 (`Movie`, `Book` 等) は WASM 側でもデシリアライズされるため、**cfg-gate してはいけない。**
+**重要:** `#[server]` 関数の戻り値型 (`Movie`, `Book`, `WebResult` 等) は WASM 側でもデシリアライズされるため、**cfg-gate してはいけない。**
 
 ## コーディング規約
 
@@ -157,6 +164,22 @@ let index = client.index("movies");
 - 環境変数: `MEILI_URL` (デフォルト `http://localhost:7700`), `MEILI_MASTER_KEY` (デフォルト `masterKey`)
 - フィルタ構築: `build_filter(&genres, year_min, year_max, rating_min)` を使う
 - sort は `Vec<String>` を作ってから `Vec<&str>` に変換して渡す (ライフタイム対策)
+- Web インデックス設定: `configure_web_index()` で searchable/filterable/sortable を設定
+
+### SearXNG クライアント
+
+`server/searxng.rs` の `search_web(query)` で SearXNG の JSON API を呼び出す。
+
+```rust
+use crate::server::searxng::search_web;
+
+let results = search_web(&query).await?;
+```
+
+- `reqwest::Client` シングルトン (`OnceLock` パターン、Meilisearch クライアントと同様)
+- 環境変数: `SEARXNG_URL` (デフォルト `http://searxng:8080`)
+- レスポンス型 `SearxngResponse` / `SearxngResult` は SSR 専用 (pub にしない)
+- URL → `i64` ID 変換: `DefaultHasher` でハッシュ → `.abs()` で正の値に
 
 ### スタイリング
 
@@ -195,22 +218,30 @@ let index = client.index("movies");
 ### 新しいインデックスを追加する場合
 
 1. `src/model/` に構造体を追加
-2. `seed/` にサンプル JSON を追加
+2. `seed/` にサンプル JSON を追加 (または外部データソース連携)
 3. `src/server/seed.rs` に投入関数を追加
-4. `src/server/meilisearch.rs` の `configure_index()` を拡張
-5. `src/api.rs` に CRUD + 検索関数を追加
+4. `src/server/meilisearch.rs` に `configure_xxx_index()` を追加
+5. `src/api.rs` の `search_items` / `get_facets` に分岐追加
+6. `src/api.rs` に詳細取得関数を追加
+7. `src/main.rs` に server fn の explicit 登録
+8. `src/components/search_bar.rs` にトグルボタン追加
+9. `src/components/result_card.rs` にカード表示分岐追加
+10. `src/pages/detail.rs` に詳細コンポーネント追加
+11. `src/app.rs` にルート追加
+
+**参考:** `web` インデックスの実装 (`web_result.rs`, `searxng.rs`, api.rs の web 分岐) が典型例
 
 ## 共通コンポーネントの使い方
 
 ### SearchBar
 
-検索入力 + インデックス切替 + Seed ボタン。
+検索入力 + インデックス切替 (映画/書籍/Web) + Seed ボタン。
 
 ```rust
 <SearchBar
     query=query                   // ReadSignal<String>
     set_query=set_query           // WriteSignal<String>
-    index=index                   // ReadSignal<String> ("movies" | "books")
+    index=index                   // ReadSignal<String> ("movies" | "books" | "web")
     set_index=set_index           // WriteSignal<String>
     on_seed=on_seed               // impl Fn() + 'static + Clone
     seeding=seeding               // ReadSignal<bool>
@@ -239,11 +270,15 @@ let index = client.index("movies");
 ### SearchResults
 
 検索結果一覧。ローディング・エラー・空状態を内部でハンドリング。
+0 件時に「Web検索して取り込む」ボタンを表示。
 
 ```rust
 <SearchResults
-    results=results.into()  // Signal<Option<Result<SearchResponse, ServerFnError>>>
-    loading=loading.into()  // Signal<bool>
+    results=results.into()        // Signal<Option<Result<SearchResponse, ServerFnError>>>
+    loading=loading.into()        // Signal<bool>
+    query=query_signal            // Signal<String>
+    on_web_import=on_web_import   // impl Fn() + 'static + Copy + Send
+    web_importing=web_importing.into()  // Signal<bool>
 />
 ```
 
@@ -280,3 +315,6 @@ let index = client.index("movies");
 | `facet_distribution` の型不一致 | BTreeMap を期待しているが HashMap が返る | `HashMap<String, HashMap<String, usize>>` を使う |
 | Server functions 404 / 405 | `Files::new("/", ...)` が全パスをキャッチ / inventory 未登録 | 静的ファイルは `/pkg` と `/assets` を個別にマウント。`register_explicit` で明示登録 |
 | Dockerfile GLIBC エラー | ビルダーと実行イメージの GLIBC バージョン不一致 | runtime に `debian:trixie-slim` を使う |
+| `tokio` が見つからない (SSR) | actix-web は tokio を直接公開しない | `actix_web::rt::time::sleep()` を使う |
+| SearXNG 接続エラー | Docker ネットワーク内のホスト名が違う | `SEARXNG_URL` 環境変数を確認。Docker 内は `http://searxng:8080` |
+| SearXNG の `publishedDate` が snake_case 警告 | Rust の命名規則違反 | `#[serde(default, rename = "publishedDate")]` で対処 |
