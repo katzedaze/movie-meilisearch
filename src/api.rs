@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::model::book::Book;
 use crate::model::movie::Movie;
 use crate::model::search::{FacetInfo, SearchResponse};
+use crate::model::web_result::WebResult;
 #[cfg(feature = "ssr")]
 use crate::model::search::{FacetValue, SearchHit};
 
@@ -48,9 +49,7 @@ pub async fn search_items(
 
     search.with_show_ranking_score(true);
 
-    let is_movie = index == "movies";
-
-    if is_movie {
+    if index == "movies" {
         let results = search
             .execute::<Movie>()
             .await
@@ -76,6 +75,43 @@ pub async fn search_items(
                     image_url: m.poster_url,
                     language: m.language,
                     index: "movies".to_string(),
+                }
+            })
+            .collect();
+
+        Ok(SearchResponse {
+            hits,
+            total_hits,
+            page: current_page,
+            total_pages,
+            processing_time_ms: results.processing_time_ms,
+        })
+    } else if index == "web" {
+        let results = search
+            .execute::<WebResult>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Search failed: {e}")))?;
+
+        let total_hits = results.estimated_total_hits.unwrap_or(0);
+        let total_pages = (total_hits + HITS_PER_PAGE - 1) / HITS_PER_PAGE;
+
+        let hits: Vec<SearchHit> = results
+            .hits
+            .into_iter()
+            .map(|h| {
+                let w = h.result;
+                SearchHit {
+                    id: w.id,
+                    title: w.title,
+                    title_en: w.title_en,
+                    description: w.description,
+                    creator: w.url.clone(),
+                    year: w.year,
+                    genres: w.genres,
+                    rating: w.rating,
+                    image_url: w.image_url,
+                    language: w.language,
+                    index: "web".to_string(),
                 }
             })
             .collect();
@@ -277,6 +313,13 @@ pub async fn get_facets(index: String) -> Result<FacetInfo, ServerFnError> {
             .map_err(|e| ServerFnError::new(format!("Facet query failed: {e}")))?;
 
         Ok(parse_facets(results.facet_distribution))
+    } else if index == "web" {
+        let results = search
+            .execute::<WebResult>()
+            .await
+            .map_err(|e| ServerFnError::new(format!("Facet query failed: {e}")))?;
+
+        Ok(parse_facets(results.facet_distribution))
     } else {
         let results = search
             .execute::<Book>()
@@ -285,6 +328,81 @@ pub async fn get_facets(index: String) -> Result<FacetInfo, ServerFnError> {
 
         Ok(parse_facets(results.facet_distribution))
     }
+}
+
+#[server]
+pub async fn search_web_and_import(query: String) -> Result<SearchResponse, ServerFnError> {
+    use crate::server::meilisearch::{configure_web_index, get_client};
+    use crate::server::searxng::search_web;
+
+    let web_results = search_web(&query)
+        .await
+        .map_err(|e| ServerFnError::new(e))?;
+
+    if web_results.is_empty() {
+        return Ok(SearchResponse {
+            hits: vec![],
+            total_hits: 0,
+            page: 1,
+            total_pages: 0,
+            processing_time_ms: 0,
+        });
+    }
+
+    // Configure web index and add documents
+    configure_web_index()
+        .await
+        .map_err(|e| ServerFnError::new(e))?;
+
+    let client = get_client();
+    let index = client.index("web");
+
+    index
+        .add_documents(&web_results, Some("id"))
+        .await
+        .map_err(|e| ServerFnError::new(format!("Failed to index web results: {e}")))?;
+
+    // Wait briefly for indexing
+    actix_web::rt::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    let total_hits = web_results.len();
+    let hits: Vec<SearchHit> = web_results
+        .into_iter()
+        .map(|w| SearchHit {
+            id: w.id,
+            title: w.title,
+            title_en: w.title_en,
+            description: w.description,
+            creator: w.url.clone(),
+            year: w.year,
+            genres: w.genres,
+            rating: w.rating,
+            image_url: w.image_url,
+            language: w.language,
+            index: "web".to_string(),
+        })
+        .collect();
+
+    Ok(SearchResponse {
+        hits,
+        total_hits,
+        page: 1,
+        total_pages: 1,
+        processing_time_ms: 0,
+    })
+}
+
+#[server]
+pub async fn get_web_result(id: i64) -> Result<WebResult, ServerFnError> {
+    use crate::server::meilisearch::get_client;
+
+    let client = get_client();
+    let index = client.index("web");
+    let result: WebResult = index
+        .get_document(&id.to_string())
+        .await
+        .map_err(|e| ServerFnError::new(format!("Web result not found: {e}")))?;
+    Ok(result)
 }
 
 #[cfg(feature = "ssr")]

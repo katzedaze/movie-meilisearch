@@ -13,6 +13,16 @@ services:
       timeout: 5s
       retries: 5
 
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./searxng:/etc/searxng
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     ports:
@@ -20,9 +30,12 @@ services:
     environment:
       MEILI_URL: http://meilisearch:7700
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKey}
+      SEARXNG_URL: http://searxng:8080
       LEPTOS_SITE_ADDR: 0.0.0.0:3000
     depends_on:
       meilisearch:
+        condition: service_healthy
+      searxng:
         condition: service_healthy
 
 volumes:

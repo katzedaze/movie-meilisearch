@@ -45,6 +45,12 @@ pub fn SearchBar(
                     >
                         "書籍"
                     </button>
+                    <button
+                        class=move || if index.get() == "web" { "toggle-btn active" } else { "toggle-btn" }
+                        on:click=move |_| set_index.set("web".to_string())
+                    >
+                        "Web"
+                    </button>
                 </div>
                 <button
                     class="seed-btn"

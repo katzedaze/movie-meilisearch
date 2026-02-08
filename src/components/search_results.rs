@@ -7,6 +7,9 @@ use crate::model::search::SearchResponse;
 pub fn SearchResults(
     results: Signal<Option<Result<SearchResponse, ServerFnError>>>,
     loading: Signal<bool>,
+    query: Signal<String>,
+    on_web_import: impl Fn() + 'static + Copy + Send,
+    web_importing: Signal<bool>,
 ) -> impl IntoView {
     view! {
         <div class="search-results">
@@ -24,9 +27,28 @@ pub fn SearchResults(
                         }.into_any(),
                         Some(Ok(response)) => {
                             if response.hits.is_empty() {
+                                let q = query.get();
+                                let has_query = !q.is_empty();
                                 view! {
                                     <div class="no-results">
                                         <p>"結果が見つかりませんでした"</p>
+                                        {if has_query {
+                                            Some(view! {
+                                                <button
+                                                    class="web-import-btn"
+                                                    on:click=move |_| on_web_import()
+                                                    disabled=web_importing
+                                                >
+                                                    {move || if web_importing.get() {
+                                                        "Web検索中..."
+                                                    } else {
+                                                        "Web検索して取り込む"
+                                                    }}
+                                                </button>
+                                            })
+                                        } else {
+                                            None
+                                        }}
                                     </div>
                                 }.into_any()
                             } else {

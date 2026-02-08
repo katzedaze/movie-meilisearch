@@ -31,6 +31,9 @@ pub fn App() -> impl IntoView {
                     <Route path=path!("/book/:id") view=move || {
                         view! { <DetailPage index="books".to_string()/> }
                     }/>
+                    <Route path=path!("/web/:id") view=move || {
+                        view! { <DetailPage index="web".to_string()/> }
+                    }/>
                 </Routes>
             </main>
         </Router>

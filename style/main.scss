@@ -639,6 +639,57 @@ a {
   }
 }
 
+// Web import button
+.web-import-btn {
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: $primary;
+  color: white;
+  border: none;
+  border-radius: $radius;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: opacity 0.2s;
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Web detail
+.detail-type-web {
+  background: rgba($success, 0.15) !important;
+  color: $success;
+  border-color: rgba($success, 0.3) !important;
+}
+
+.web-detail-actions {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid $border;
+}
+
+.web-visit-btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background: $primary;
+  color: white !important;
+  border-radius: $radius;
+  font-weight: 500;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.9;
+    color: white !important;
+  }
+}
+
 // Not Found page
 .not-found {
   text-align: center;

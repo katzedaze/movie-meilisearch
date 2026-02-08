@@ -1,14 +1,14 @@
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 
-use crate::api::{get_book, get_movie};
+use crate::api::{get_book, get_movie, get_web_result};
 use crate::model::book::Book;
 use crate::model::movie::Movie;
+use crate::model::web_result::WebResult;
 
 #[component]
 pub fn DetailPage(index: String) -> impl IntoView {
     let params = use_params_map();
-    let is_movie = index == "movies";
 
     let id = move || {
         params
@@ -18,7 +18,7 @@ pub fn DetailPage(index: String) -> impl IntoView {
             .unwrap_or(0)
     };
 
-    if is_movie {
+    if index == "movies" {
         let movie_resource = Resource::new(move || id(), |id| async move { get_movie(id).await });
 
         view! {
@@ -29,6 +29,27 @@ pub fn DetailPage(index: String) -> impl IntoView {
                         movie_resource.get().map(|result| {
                             match result {
                                 Ok(movie) => view! { <MovieDetail movie=movie/> }.into_any(),
+                                Err(e) => view! {
+                                    <div class="error">"エラー: "{e.to_string()}</div>
+                                }.into_any(),
+                            }
+                        })
+                    }}
+                </Suspense>
+            </div>
+        }
+        .into_any()
+    } else if index == "web" {
+        let web_resource = Resource::new(move || id(), |id| async move { get_web_result(id).await });
+
+        view! {
+            <div class="detail-page">
+                <a href="/" class="back-link">"← 検索に戻る"</a>
+                <Suspense fallback=move || view! { <div class="loading">"読み込み中..."</div> }>
+                    {move || {
+                        web_resource.get().map(|result| {
+                            match result {
+                                Ok(web) => view! { <WebResultDetail result=web/> }.into_any(),
                                 Err(e) => view! {
                                     <div class="error">"エラー: "{e.to_string()}</div>
                                 }.into_any(),
@@ -141,6 +162,48 @@ fn BookDetail(book: Book) -> impl IntoView {
             <div class="detail-description">
                 <h2>"概要"</h2>
                 <p>{book.description.clone()}</p>
+            </div>
+        </article>
+    }
+}
+
+#[component]
+fn WebResultDetail(result: WebResult) -> impl IntoView {
+    let url = result.url.clone();
+    let url_display = result.url.clone();
+    let published = result.published_date.clone();
+    let engine = result.source_engine.clone();
+
+    view! {
+        <article class="detail-card">
+            <div class="detail-header">
+                <h1>{result.title.clone()}</h1>
+            </div>
+            <div class="detail-meta">
+                <span class="detail-type detail-type-web">"Web"</span>
+                {engine.map(|e| view! {
+                    <span class="detail-lang">{e}</span>
+                })}
+                {published.map(|d| view! {
+                    <span class="detail-year">{d}</span>
+                })}
+            </div>
+            <div class="detail-info">
+                <div class="info-row">
+                    <span class="info-label">"URL"</span>
+                    <span class="info-value">
+                        <a href=url.clone() target="_blank" rel="noopener noreferrer">{url_display}</a>
+                    </span>
+                </div>
+            </div>
+            <div class="detail-description">
+                <h2>"概要"</h2>
+                <p>{result.description.clone()}</p>
+            </div>
+            <div class="web-detail-actions">
+                <a href=url class="web-visit-btn" target="_blank" rel="noopener noreferrer">
+                    "元のページを開く"
+                </a>
             </div>
         </article>
     }

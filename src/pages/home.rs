@@ -2,7 +2,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_use::signal_debounced;
 
-use crate::api::{get_facets, search_items, seed_data};
+use crate::api::{get_facets, search_items, search_web_and_import, seed_data};
 use crate::components::facet_panel::FacetPanel;
 use crate::components::pagination::Pagination;
 use crate::components::search_bar::SearchBar;
@@ -22,6 +22,7 @@ pub fn HomePage() -> impl IntoView {
     let (seeding, set_seeding) = signal(false);
     let (seed_message, set_seed_message) = signal(Option::<String>::None);
     let (loading, set_loading) = signal(false);
+    let (web_importing, set_web_importing) = signal(false);
 
     let debounced_query: Signal<String> = signal_debounced(query, 300.0);
 
@@ -104,6 +105,27 @@ pub fn HomePage() -> impl IntoView {
         });
     };
 
+    let on_web_import = move || {
+        let q = query.get_untracked();
+        if q.is_empty() {
+            return;
+        }
+        set_web_importing.set(true);
+        spawn_local(async move {
+            match search_web_and_import(q).await {
+                Ok(response) => {
+                    set_results.set(Some(Ok(response)));
+                    // Switch to web tab
+                    set_index.set("web".to_string());
+                }
+                Err(e) => {
+                    set_seed_message.set(Some(format!("Web検索エラー: {e}")));
+                }
+            }
+            set_web_importing.set(false);
+        });
+    };
+
     let total_pages = Signal::derive(move || {
         results
             .get()
@@ -117,6 +139,8 @@ pub fn HomePage() -> impl IntoView {
     let on_page_change = move |new_page: usize| {
         set_page.set(new_page);
     };
+
+    let query_signal: Signal<String> = Signal::derive(move || query.get());
 
     view! {
         <div class="home-page">
@@ -150,6 +174,9 @@ pub fn HomePage() -> impl IntoView {
                     <SearchResults
                         results=results.into()
                         loading=loading.into()
+                        query=query_signal
+                        on_web_import=on_web_import
+                        web_importing=web_importing.into()
                     />
                     <Pagination
                         current_page=current_page

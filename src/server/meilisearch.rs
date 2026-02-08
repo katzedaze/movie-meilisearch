@@ -42,6 +42,32 @@ pub async fn configure_index(index_name: &str, is_movie: bool) -> Result<(), Str
     Ok(())
 }
 
+pub async fn configure_web_index() -> Result<(), String> {
+    let client = get_client();
+    let index = client.index("web");
+
+    let searchable = vec!["title", "description", "url", "source_engine"];
+    let filterable = vec!["genres", "year", "rating", "language"];
+    let sortable = vec!["year", "rating", "title"];
+
+    index
+        .set_searchable_attributes(&searchable)
+        .await
+        .map_err(|e| format!("Failed to set searchable attributes: {e}"))?;
+
+    index
+        .set_filterable_attributes(&filterable)
+        .await
+        .map_err(|e| format!("Failed to set filterable attributes: {e}"))?;
+
+    index
+        .set_sortable_attributes(&sortable)
+        .await
+        .map_err(|e| format!("Failed to set sortable attributes: {e}"))?;
+
+    Ok(())
+}
+
 pub fn build_filter(
     genres: &[String],
     year_min: Option<i32>,

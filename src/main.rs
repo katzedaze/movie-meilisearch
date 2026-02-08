@@ -19,6 +19,8 @@ async fn main() -> std::io::Result<()> {
     server_fn::actix::register_explicit::<meilisearch_search_app::api::DeleteBook>();
     server_fn::actix::register_explicit::<meilisearch_search_app::api::SeedData>();
     server_fn::actix::register_explicit::<meilisearch_search_app::api::GetFacets>();
+    server_fn::actix::register_explicit::<meilisearch_search_app::api::SearchWebAndImport>();
+    server_fn::actix::register_explicit::<meilisearch_search_app::api::GetWebResult>();
 
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;
