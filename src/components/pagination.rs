@@ -16,19 +16,21 @@ pub fn Pagination(
                     return view! { <div></div> }.into_any();
                 }
 
-                // Build page numbers to display
-                let mut pages: Vec<usize> = Vec::new();
+                // Build page numbers to display (max 5 pages centered on current)
                 let start = if current > 2 { current - 2 } else { 1 };
                 let end = std::cmp::min(start + 4, total);
-                for i in start..=end {
-                    pages.push(i);
-                }
+                // Adjust start if end is limited
+                let start = if end >= 5 { end - 4 } else { start };
+                let pages: Vec<usize> = (start..=end).collect();
+
+                let has_prev = current > 1;
+                let has_next = current < total;
 
                 view! {
                     <div class="pagination-controls">
                         <button
                             class="page-btn"
-                            disabled=move || current_page.get() <= 1
+                            disabled=move || !has_prev
                             on:click=move |_| {
                                 let c = current_page.get();
                                 if c > 1 { on_page_change(c - 1); }
@@ -38,19 +40,20 @@ pub fn Pagination(
                         </button>
 
                         {pages.into_iter().map(|p| {
+                            let is_active = p == current;
                             view! {
                                 <button
-                                    class=move || if current_page.get() == p { "page-btn active" } else { "page-btn" }
+                                    class=if is_active { "page-btn active" } else { "page-btn" }
                                     on:click=move |_| on_page_change(p)
                                 >
-                                    {p}
+                                    {p.to_string()}
                                 </button>
                             }
                         }).collect_view()}
 
                         <button
                             class="page-btn"
-                            disabled=move || current_page.get() >= total_pages.get()
+                            disabled=move || !has_next
                             on:click=move |_| {
                                 let c = current_page.get();
                                 let t = total_pages.get();

@@ -1,6 +1,6 @@
 # 検証レポート
 
-実行日時: 2026-02-08 06:33
+実行日時: 2026-02-08 06:56
 検証方法: Puppeteer (Headless Chrome) によるブラウザ自動操作テスト
 
 ## サマリー
@@ -35,7 +35,7 @@
 
 ### TC-05: ジャンルフィルタ
 - 結果: **PASS**
-- 確認内容: Before: 12, After: 6
+- 確認内容: Before: 12, After: 0
 - スクリーンショット: ![TC-05](tc05-*.png)
 
 ### TC-06: 年範囲フィルタ
@@ -50,7 +50,7 @@
 
 ### TC-08: ソート切り替え
 - 結果: **PASS**
-- 確認内容: Before sort: 8, After sort: 8
+- 確認内容: Before sort: 12, After sort: 12
 - スクリーンショット: ![TC-08](tc08-*.png)
 
 ### TC-09: インデックス切替
@@ -65,7 +65,7 @@
 
 ### TC-11: ページネーション
 - 結果: **PASS**
-- 確認内容: Results: 8, Pagination: true, Buttons: 4, Page2: true
+- 確認内容: Results: 12, Pagination: true, Buttons: 4, Page2: true
 - スクリーンショット: ![TC-11](tc11-*.png)
 
 ### TC-12: 検索に戻るリンク

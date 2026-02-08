@@ -40,7 +40,10 @@ pub fn HomePage() -> impl IntoView {
         });
     });
 
-    // Search when debounced query or filters change
+    // Track previous filter key to detect filter changes vs page changes
+    let (prev_filter_key, set_prev_filter_key) = signal(String::new());
+
+    // Combined search + page reset Effect
     Effect::new(move |_| {
         let q = debounced_query.get();
         let idx = index.get();
@@ -50,6 +53,19 @@ pub fn HomePage() -> impl IntoView {
         let r_min = rating_min.get();
         let p = page.get();
         let s = sort.get();
+
+        // Build a key from filter params (excluding page)
+        let filter_key = format!("{q}|{idx}|{genres:?}|{y_min:?}|{y_max:?}|{r_min:?}|{s:?}");
+        let prev = prev_filter_key.get_untracked();
+        let filters_changed = !prev.is_empty() && prev != filter_key;
+        set_prev_filter_key.set(filter_key);
+
+        // If filters changed while on a page other than 1, reset to page 1
+        // and let the re-trigger handle the search
+        if filters_changed && p != 1 {
+            set_page.set(1);
+            return;
+        }
 
         if q.is_empty() && genres.is_empty() && y_min.is_none() && y_max.is_none() && r_min.is_none() {
             set_results.set(None);
@@ -62,17 +78,6 @@ pub fn HomePage() -> impl IntoView {
             set_results.set(Some(result));
             set_loading.set(false);
         });
-    });
-
-    // Reset page to 1 when filters change
-    Effect::new(move |_| {
-        let _ = debounced_query.get();
-        let _ = selected_genres.get();
-        let _ = year_min.get();
-        let _ = year_max.get();
-        let _ = rating_min.get();
-        let _ = sort.get();
-        set_page.set(1);
     });
 
     let on_seed = move || {
