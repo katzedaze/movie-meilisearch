@@ -1,15 +1,15 @@
 # 検証レポート
 
-実行日時: 2026-02-08 06:56
+実行日時: 2026-02-08 07:39
 検証方法: Puppeteer (Headless Chrome) によるブラウザ自動操作テスト
 
 ## サマリー
 
 | 結果 | 件数 |
 | --- | --- |
-| PASS | 15 |
+| PASS | 20 |
 | FAIL | 0 |
-| 合計 | 15 |
+| 合計 | 20 |
 
 ## テスト結果
 
@@ -35,7 +35,7 @@
 
 ### TC-05: ジャンルフィルタ
 - 結果: **PASS**
-- 確認内容: Before: 12, After: 0
+- 確認内容: Before: 12, After: 4
 - スクリーンショット: ![TC-05](tc05-*.png)
 
 ### TC-06: 年範囲フィルタ
@@ -87,4 +87,29 @@
 - 結果: **PASS**
 - 確認内容: Status: 404, Message: true
 - スクリーンショット: ![TC-15](tc15-*.png)
+
+### TC-16: Web タブ表示
+- 結果: **PASS**
+- 確認内容: Web tab exists: true, Active: true
+- スクリーンショット: ![TC-16](tc16-*.png)
+
+### TC-17: Web検索取り込みボタン表示
+- 結果: **PASS**
+- 確認内容: Button found: true, Text: "Web検索して取り込む"
+- スクリーンショット: ![TC-17](tc17-*.png)
+
+### TC-18: Web検索取り込み実行
+- 結果: **PASS**
+- 確認内容: Imported results: 12
+- スクリーンショット: ![TC-18](tc18-*.png)
+
+### TC-19: Web タブ検索
+- 結果: **PASS**
+- 確認内容: Web tab results: 12, Web label: true
+- スクリーンショット: ![TC-19](tc19-*.png)
+
+### TC-20: Web 詳細ページ
+- 結果: **PASS**
+- 確認内容: Detail: true, Web route: true, URL link: true
+- スクリーンショット: ![TC-20](tc20-*.png)
 

@@ -347,6 +347,147 @@ async function delay(ms) {
   await screenshot(page, 'tc15-not-found');
 
   // ==============================
+  // TC-16: Web Tab Toggle
+  // ==============================
+  console.log('\n=== TC-16: Web Tab Toggle ===');
+  await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 15000 });
+  await delay(500);
+  {
+    const toggleBtns = await page.$$('.toggle-btn');
+    const hasWebTab = toggleBtns.length >= 3;
+    let webTabActive = false;
+    if (hasWebTab) {
+      await toggleBtns[2].click(); // Third button = "Web"
+      await delay(500);
+      webTabActive = await toggleBtns[2].evaluate(el => el.classList.contains('active'));
+    }
+    record('TC-16', 'Web タブ表示', hasWebTab && webTabActive, `Web tab exists: ${hasWebTab}, Active: ${webTabActive}`);
+  }
+  await screenshot(page, 'tc16-web-tab');
+
+  // ==============================
+  // TC-17: Web Import Button on No Results
+  // ==============================
+  console.log('\n=== TC-17: Web Import Button ===');
+  await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 15000 });
+  await delay(500);
+  {
+    const input = await page.$('.search-input');
+    await input.click({ clickCount: 3 });
+    await input.type('xyznonexistent999', { delay: 50 });
+    await delay(2000);
+    await page.waitForFunction(
+      () => document.body.innerText.includes('見つかりませんでした'),
+      { timeout: 10000 }
+    ).catch(() => {});
+    const importBtn = await page.$('.web-import-btn');
+    const hasImportBtn = importBtn !== null;
+    let btnText = '';
+    if (hasImportBtn) {
+      btnText = await importBtn.evaluate(el => el.textContent);
+    }
+    record('TC-17', 'Web検索取り込みボタン表示', hasImportBtn, `Button found: ${hasImportBtn}, Text: "${btnText}"`);
+  }
+  await screenshot(page, 'tc17-web-import-btn');
+
+  // ==============================
+  // TC-18: Web Search and Import
+  // ==============================
+  console.log('\n=== TC-18: Web Search and Import ===');
+  await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 15000 });
+  await delay(500);
+  {
+    const input = await page.$('.search-input');
+    await input.click({ clickCount: 3 });
+    await input.type('Python programming', { delay: 50 });
+    await delay(2000);
+    await page.waitForFunction(
+      () => document.body.innerText.includes('見つかりませんでした') || document.querySelectorAll('.result-card').length > 0,
+      { timeout: 10000 }
+    ).catch(() => {});
+
+    const importBtn = await page.$('.web-import-btn');
+    let importSuccess = false;
+    if (importBtn) {
+      await importBtn.click();
+      // Wait for import to complete (button text changes, then results appear)
+      await page.waitForFunction(
+        () => document.querySelectorAll('.result-card').length > 0,
+        { timeout: 30000 }
+      ).catch(() => {});
+      await delay(1000);
+      const webResults = await page.$$eval('.result-card', cards => cards.length);
+      importSuccess = webResults > 0;
+      record('TC-18', 'Web検索取り込み実行', importSuccess, `Imported results: ${webResults}`);
+    } else {
+      // Results already exist (previously imported)
+      const existing = await page.$$eval('.result-card', cards => cards.length);
+      record('TC-18', 'Web検索取り込み実行', existing > 0, `Already have results: ${existing}`);
+    }
+  }
+  await screenshot(page, 'tc18-web-import-results');
+
+  // ==============================
+  // TC-19: Web Tab Search
+  // ==============================
+  console.log('\n=== TC-19: Web Tab Search ===');
+  await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 15000 });
+  await delay(500);
+  {
+    // Switch to Web tab
+    const toggleBtns = await page.$$('.toggle-btn');
+    if (toggleBtns.length >= 3) {
+      await toggleBtns[2].click();
+      await delay(500);
+
+      const input = await page.$('.search-input');
+      await input.click({ clickCount: 3 });
+      await input.type('Python', { delay: 50 });
+      await delay(2000);
+      await page.waitForFunction(
+        () => document.querySelectorAll('.result-card').length > 0 || document.body.innerText.includes('見つかりませんでした'),
+        { timeout: 10000 }
+      ).catch(() => {});
+      const webSearchResults = await page.$$eval('.result-card', cards => cards.length);
+      // Check that cards have "Web" type label
+      let hasWebLabel = false;
+      if (webSearchResults > 0) {
+        hasWebLabel = await page.$eval('.card-type', el => el.textContent.includes('Web')).catch(() => false);
+      }
+      record('TC-19', 'Web タブ検索', webSearchResults > 0, `Web tab results: ${webSearchResults}, Web label: ${hasWebLabel}`);
+    } else {
+      record('TC-19', 'Web タブ検索', false, 'Web toggle button not found');
+    }
+  }
+  await screenshot(page, 'tc19-web-tab-search');
+
+  // ==============================
+  // TC-20: Web Detail Page
+  // ==============================
+  console.log('\n=== TC-20: Web Detail Page ===');
+  {
+    // Click on a web result card (should be on web tab from TC-19)
+    const webCard = await page.$('.result-card');
+    if (webCard) {
+      await webCard.click();
+      await delay(2000);
+      await page.waitForFunction(
+        () => document.querySelector('.detail-page') !== null,
+        { timeout: 10000 }
+      ).catch(() => {});
+      const hasDetailPage = await page.$('.detail-page') !== null;
+      const hasWebType = await page.evaluate(() => document.body.innerText.includes('Web')).catch(() => false);
+      const hasUrlLink = await page.$('.web-visit-btn, .info-value a') !== null;
+      const currentUrl = page.url();
+      const isWebRoute = currentUrl.includes('/web/');
+      record('TC-20', 'Web 詳細ページ', hasDetailPage && isWebRoute, `Detail: ${hasDetailPage}, Web route: ${isWebRoute}, URL link: ${hasUrlLink}`);
+    } else {
+      record('TC-20', 'Web 詳細ページ', false, 'No web result card to click');
+    }
+  }
+  await screenshot(page, 'tc20-web-detail');
+
+  // ==============================
   // Generate Report
   // ==============================
   const passCount = RESULTS.filter(r => r.pass).length;

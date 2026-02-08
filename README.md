@@ -27,6 +27,14 @@
 |:---:|:---:|
 | ![Pagination](docs/evidence/tc11-pagination.png) | ![404](docs/evidence/tc15-not-found.png) |
 
+| Web検索取り込みボタン | Web検索結果 |
+|:---:|:---:|
+| ![Web Import Button](docs/evidence/tc17-web-import-btn.png) | ![Web Import Results](docs/evidence/tc18-web-import-results.png) |
+
+| Web タブ検索 | Web 詳細ページ |
+|:---:|:---:|
+| ![Web Tab Search](docs/evidence/tc19-web-tab-search.png) | ![Web Detail](docs/evidence/tc20-web-detail.png) |
+
 ## 技術スタック
 
 | レイヤー | 技術 | バージョン |
@@ -176,7 +184,7 @@ SearXNG の設定ファイルは `searxng/settings.yml` にあります。Docker
 
 ## テスト
 
-Puppeteer による自動ブラウザテスト (15 シナリオ):
+Puppeteer による自動ブラウザテスト (20 シナリオ):
 
 ```bash
 # アプリが起動している状態で実行
