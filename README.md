@@ -43,6 +43,14 @@
 
 - Docker & Docker Compose
 
+### 環境変数の設定
+
+```bash
+cp .env.sample .env
+```
+
+必要に応じて `.env` 内の値を変更してください。
+
 ### 起動
 
 ```bash
