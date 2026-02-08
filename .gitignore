@@ -1,0 +1,27 @@
+# Rust
+/target/
+Cargo.lock
+
+# Node.js (Puppeteer)
+node_modules/
+package.json
+package-lock.json
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+meili_data/
+
+# Claude Code
+.claude/
