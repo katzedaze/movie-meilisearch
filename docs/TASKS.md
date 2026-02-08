@@ -115,6 +115,55 @@
 - [x] スクリーンショット 15 枚が `docs/evidence/` に保存済み
 - [x] 不具合修正 → 再検証 (GLIBC / ServerFn / 404 / genres デシリアライズ の 4 件を修正)
 
+## Phase 13: SearXNG Web 検索取り込み機能
+
+### インフラ
+- [x] `Cargo.toml` — `reqwest` 依存追加 (SSR feature)
+- [x] `docker-compose.yml` — SearXNG サービス追加
+- [x] `searxng/settings.yml` — SearXNG 設定 (JSON API 有効化)
+- [x] `.env.sample` — `SEARXNG_URL` 追加
+
+### データモデル
+- [x] `src/model/web_result.rs` — WebResult 構造体 (URL ハッシュ ID)
+- [x] `src/model/mod.rs` — `pub mod web_result` 追加
+
+### サーバーロジック
+- [x] `src/server/searxng.rs` — SearXNG HTTP クライアント (reqwest シングルトン)
+- [x] `src/server/mod.rs` — `pub mod searxng` 追加
+- [x] `src/server/meilisearch.rs` — `configure_web_index()` 追加
+
+### API
+- [x] `search_web_and_import` — SearXNG 検索 → web インデックスに投入 → SearchResponse 返却
+- [x] `get_web_result` — Web 結果詳細取得
+- [x] `search_items` — `index == "web"` 分岐追加
+- [x] `get_facets` — `index == "web"` 分岐追加
+- [x] `src/main.rs` — `SearchWebAndImport`, `GetWebResult` の explicit 登録
+
+### UI
+- [x] `SearchBar` — "Web" トグルボタン (3 タブ目) 追加
+- [x] `SearchResults` — 0 件時「Web検索して取り込む」ボタン表示
+- [x] `ResultCard` — `index == "web"` 対応 (URL 表示, 評価非表示)
+- [x] `HomePage` — `web_importing` シグナル + `on_web_import` コールバック追加
+- [x] `DetailPage` — `WebResultDetail` コンポーネント追加 (元 URL リンク付き)
+- [x] `app.rs` — `/web/:id` ルート追加
+- [x] `style/main.scss` — `.web-import-btn`, `.web-visit-btn` 等スタイル追加
+
+### ビルド確認
+- [x] `cargo check --features ssr` 通過 (警告なし)
+- [x] `cargo check --target wasm32-unknown-unknown --features hydrate` 通過
+- [x] `docker compose up --build` で 3 サービス起動確認
+
+## Phase 14: Web 検索機能のテスト + スクリーンショット
+
+- [x] TC-16: Web タブ切替 — Web ボタン表示 + アクティブ状態
+- [x] TC-17: Web 取り込みボタン表示 — 0 件時「Web検索して取り込む」ボタン
+- [x] TC-18: Web 検索取り込み実行 — SearXNG 検索 → 結果カード表示
+- [x] TC-19: Web タブ検索 — 取り込み済み結果の再検索 + "Web" ラベル表示
+- [x] TC-20: Web 詳細ページ — `/web/:id` ルート + 元 URL リンク
+- [x] Puppeteer 自動検証 — **20/20 PASS**
+- [x] スクリーンショット 20 枚が `docs/evidence/` に保存済み
+- [x] README.md に Web 検索スクリーンショット追加
+
 ---
 
 **凡例:** `[x]` = 完了, `[ ]` = 未着手
